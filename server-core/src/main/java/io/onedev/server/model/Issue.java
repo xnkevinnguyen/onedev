@@ -87,6 +87,12 @@ import io.onedev.server.web.editable.annotation.Editable;
 @Editable
 public class Issue extends AbstractEntity implements Referenceable, AttachmentStorageSupport {
 
+	private IssueProduct3 issueProduct3 = new IssueProduct3();
+
+	private IssueProduct2 issueProduct2 = new IssueProduct2();
+
+	private IssueProduct issueProduct = new IssueProduct();
+
 	private static final long serialVersionUID = 1L;
 
 	public static final String PROP_NUMBER_SCOPE = "numberScope";
@@ -166,19 +172,12 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 	@Column(nullable=false)
 	private String state;
 	
-	@Column(nullable=false)
-	private String title;
-	
 	@Column(length=14000)
 	private String description;
 	
 	@ManyToOne(fetch=FetchType.LAZY)
 	@JoinColumn(nullable=false)
 	private Project numberScope;
-	
-	@ManyToOne(fetch=FetchType.LAZY)
-	@JoinColumn(nullable=false)
-	private Project project;
 	
 	@ManyToOne(fetch=FetchType.LAZY)
 	private Milestone milestone;
@@ -198,38 +197,14 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 	@Column(nullable=false)
 	private String uuid = UUID.randomUUID().toString();
 
-	private long number;
-	
 	@Embedded
 	private LastUpdate lastUpdate;
-	
-	// used for title search in markdown editor
-	@Column(nullable=false)
-	@JsonView(DefaultView.class)
-	private String noSpaceTitle;
-	
-	@OneToMany(mappedBy="issue", cascade=CascadeType.REMOVE)
-	private Collection<IssueField> fields = new ArrayList<>();
-	
-	@OneToMany(mappedBy="issue", cascade=CascadeType.REMOVE)
-	private Collection<IssueComment> comments = new ArrayList<>();
-	
-	@OneToMany(mappedBy="issue", cascade=CascadeType.REMOVE)
-	private Collection<IssueChange> changes = new ArrayList<>();
 	
 	@OneToMany(mappedBy="issue", cascade=CascadeType.REMOVE)
 	private Collection<IssueVote> votes = new ArrayList<>();
 	
 	@OneToMany(mappedBy="issue", cascade=CascadeType.REMOVE)
 	private Collection<IssueWatch> watches = new ArrayList<>();
-	
-	private transient List<RevCommit> commits;
-	
-	private transient List<PullRequest> pullRequests;
-	
-	private transient Map<String, Input> fieldInputs;
-	
-	private transient Collection<User> participants;
 	
 	public String getState() {
 		return state;
@@ -240,12 +215,11 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 	}
 
 	public String getTitle() {
-		return title;
+		return issueProduct2.getTitle();
 	}
 
 	public void setTitle(String title) {
-		this.title = title;
-		noSpaceTitle = StringUtils.deleteWhitespace(title);
+		issueProduct2.setTitle(title);
 	}
 
 	public String getDescription() {
@@ -266,11 +240,11 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 
 	@Override
 	public Project getProject() {
-		return project;
+		return issueProduct2.getProject();
 	}
 
 	public void setProject(Project project) {
-		this.project = project;
+		issueProduct2.setProject(project);
 	}
 
 	public String getUUID() {
@@ -283,7 +257,7 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 
 	@Override
 	public long getNumber() {
-		return number;
+		return issueProduct2.getNumber();
 	}
 	
 	@Override
@@ -292,7 +266,7 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 	}
 	
 	public void setNumber(long number) {
-		this.number = number;
+		issueProduct2.setNumber(number);
 	}
 
 	public LastUpdate getLastUpdate() {
@@ -333,19 +307,19 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 	}
 
 	public Collection<IssueComment> getComments() {
-		return comments;
+		return issueProduct3.getComments();
 	}
 
 	public void setComments(Collection<IssueComment> comments) {
-		this.comments = comments;
+		issueProduct3.setComments(comments);
 	}
 
 	public Collection<IssueChange> getChanges() {
-		return changes;
+		return issueProduct3.getChanges();
 	}
 
 	public void setChanges(Collection<IssueChange> changes) {
-		this.changes = changes;
+		issueProduct3.setChanges(changes);
 	}
 
 	public Collection<IssueVote> getVotes() {
@@ -398,11 +372,11 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 	}
 
 	public Collection<IssueField> getFields() {
-		return fields;
+		return issueProduct.getFields();
 	}
 
 	public void setFields(Collection<IssueField> fields) {
-		this.fields = fields;
+		issueProduct.setFields(fields);
 	}
 	
 	public boolean isVisitedAfter(Date date) {
@@ -416,53 +390,11 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 	}
 	
 	public Collection<String> getFieldNames() {
-		return getFields().stream().map(it->it.getName()).collect(Collectors.toSet());
+		return issueProduct.getFieldNames();
 	}
 	
 	public Map<String, Input> getFieldInputs() {
-		if (fieldInputs == null) {
-			fieldInputs = new LinkedHashMap<>();
-	
-			Map<String, List<IssueField>> fieldMap = new HashMap<>(); 
-			for (IssueField field: getFields()) {
-				List<IssueField> fieldsOfName = fieldMap.get(field.getName());
-				if (fieldsOfName == null) {
-					fieldsOfName = new ArrayList<>();
-					fieldMap.put(field.getName(), fieldsOfName);
-				}
-				fieldsOfName.add(field);
-			}
-			for (FieldSpec fieldSpec: getIssueSetting().getFieldSpecs()) {
-				String fieldName = fieldSpec.getName();
-				List<IssueField> fields = fieldMap.get(fieldName);
-				if (fields != null) {
-					Collections.sort(fields, new Comparator<IssueField>() {
-
-						@Override
-						public int compare(IssueField o1, IssueField o2) {
-							long result = o1.getOrdinal() - o2.getOrdinal();
-							if (result > 0)
-								return 1;
-							else if (result < 0)
-								return -1;
-							else
-								return 0;
-						}
-						
-					});
-					String type = fields.iterator().next().getType();
-					List<String> values = new ArrayList<>();
-					for (IssueField field: fields) {
-						if (field.getValue() != null)
-							values.add(field.getValue());
-					}
-					if (!fieldSpec.isAllowMultiple() && values.size() > 1) 
-						values = Lists.newArrayList(values.iterator().next());
-					fieldInputs.put(fieldName, new Input(fieldName, type, values));
-				}
-			}
-		}
-		return fieldInputs;
+		return issueProduct.getFieldInputs();
 	}
 	
 	public static String getWebSocketObservable(Long issueId) {
@@ -476,200 +408,47 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 
 	@Nullable
 	public Object getFieldValue(String fieldName) {
-		Input input = getFieldInputs().get(fieldName);
-		
-		if (input != null) 
-			return input.getTypedValue(getIssueSetting().getFieldSpec(fieldName));
-		else
-			return null;
-	}
-	
-	private GlobalIssueSetting getIssueSetting() {
-		return OneDev.getInstance(SettingManager.class).getIssueSetting();
+		return issueProduct.getFieldValue(fieldName);
 	}
 	
 	public long getFieldOrdinal(String fieldName, String fieldValue) {
-		GlobalIssueSetting issueSetting = OneDev.getInstance(SettingManager.class).getIssueSetting();
-		FieldSpec fieldSpec = issueSetting.getFieldSpec(fieldName);
-		if (fieldSpec != null) 
-			return fieldSpec.getOrdinal(fieldValue);
-		else 
-			return -1;
+		return issueProduct.getFieldOrdinal(fieldName, fieldValue);
 	}
 	
 	public Serializable getFieldBean(Class<?> fieldBeanClass, boolean withDefaultValue) {
-		BeanDescriptor beanDescriptor = new BeanDescriptor(fieldBeanClass);
-		Serializable fieldBean = (Serializable) beanDescriptor.newBeanInstance();
-
-		for (List<PropertyDescriptor> groupProperties: beanDescriptor.getProperties().values()) {
-			for (PropertyDescriptor property: groupProperties) {
-				Input input = getFieldInputs().get(property.getDisplayName());
-				if (input != null) {
-					FieldSpec fieldSpec = getIssueSetting().getFieldSpec(input.getName());
-					property.setPropertyValue(fieldBean, input.getTypedValue(fieldSpec));
-				} else if (!withDefaultValue) {
-					property.setPropertyValue(fieldBean, null);
-				}
-			}
-		}
-		return fieldBean;
+		return issueProduct.getFieldBean(fieldBeanClass, withDefaultValue);
 	}
 	
 	public void removeFields(Collection<String> fieldNames) {
-		for (Iterator<IssueField> it = getFields().iterator(); it.hasNext();) {
-			if (fieldNames.contains(it.next().getName()))
-				it.remove();
-		}
-		fieldInputs = null;
+		issueProduct.removeFields(fieldNames);
 	}
 	
 	public void setFieldValues(Map<String, Object> fieldValues) {
-		for (Map.Entry<String, Object> entry: fieldValues.entrySet())
-			setFieldValue(entry.getKey(), entry.getValue());
+		issueProduct.setFieldValues(fieldValues, this);
 	}
 	
 	public void setFieldValue(String fieldName, @Nullable Object fieldValue) {
-		for (Iterator<IssueField> it = getFields().iterator(); it.hasNext();) {
-			if (fieldName.equals(it.next().getName()))
-				it.remove();
-		}
-		
-		FieldSpec fieldSpec = getIssueSetting().getFieldSpec(fieldName);
-		if (fieldSpec != null) {
-			List<String> strings = fieldSpec.convertToStrings(fieldValue);
-			if (!strings.isEmpty()) {
-				for (String string: strings) {
-					IssueField field = new IssueField();
-					field.setIssue(this);
-					field.setName(fieldName);
-					field.setOrdinal(getFieldOrdinal(fieldName, string));
-					field.setType(fieldSpec.getType());
-					field.setValue(string);
-					getFields().add(field);
-				}
-			} else {
-				IssueField field = new IssueField();
-				field.setIssue(this);
-				field.setName(fieldName);
-				field.setOrdinal(getFieldOrdinal(fieldName, null));
-				field.setType(fieldSpec.getType());
-				getFields().add(field);
-			}
-		}
-		fieldInputs = null;
+		issueProduct.setFieldValue(fieldName, fieldValue, this);
 	}
 
 	public boolean isFieldVisible(String fieldName) {
-		return isFieldVisible(fieldName, Sets.newHashSet());
+		return issueProduct.isFieldVisible(fieldName, Sets.newHashSet());
 	}
 	
 	public Collection<User> getParticipants() {
-		if (participants == null) {
-			participants = new LinkedHashSet<>();
-			if (getSubmitter() != null)
-				participants.add(getSubmitter());
-			UserManager userManager = OneDev.getInstance(UserManager.class);
-			for (IssueField field: getFields()) {
-				if (field.getType().equals(InputSpec.USER)) {
-					if (field.getValue() != null) {
-						User user = userManager.findByName(field.getValue());
-						if (user != null)
-							participants.add(user);
-					}
-				} else if (field.getType().equals(InputSpec.GROUP)) {
-					if (field.getValue() != null) {
-						Group group = OneDev.getInstance(GroupManager.class).find(field.getValue());
-						if (group != null)
-							participants.addAll(group.getMembers());
-					}
-				}
-			}
-			for (IssueComment comment: getComments()) {
-				if (comment.getUser() != null)
-					participants.add(comment.getUser());
-			}
-			for (IssueChange change: getChanges()) {
-				if (change.getUser() != null)
-					participants.add(change.getUser());
-			}
-			participants.remove(userManager.getSystem());
-		}
-		return participants;
+		return issueProduct3.getParticipants(this.submitter, this);
 	}
 
-	private boolean isFieldVisible(String fieldName, Set<String> checkedFieldNames) {
-		if (!checkedFieldNames.add(fieldName))
-			return false;
-		
-		FieldSpec fieldSpec = getIssueSetting().getFieldSpec(fieldName);
-		if (fieldSpec != null) {
-			if (fieldSpec.getShowCondition() != null) {
-				Input dependentInput = getFieldInputs().get(fieldSpec.getShowCondition().getInputName());
-				if (dependentInput != null) {
-					if (fieldSpec.getShowCondition().getValueMatcher().matches(dependentInput.getValues()))
-						return isFieldVisible(dependentInput.getName(), checkedFieldNames);
-					else
-						return false;
-				} else {
-					return false;
-				}
-			} else {
-				return true;
-			}
-		} else {
-			return false;
-		}
-	}
-	
 	public IssueFacade getFacade() {
-		return new IssueFacade(getId(), getProject().getId(), getNumber());
+		return issueProduct2.getFacade(this);
 	}
 	
 	public List<PullRequest> getPullRequests() {
-		if (pullRequests == null) {
-			pullRequests = new ArrayList<>();
-
-			PullRequestInfoManager infoManager = OneDev.getInstance(PullRequestInfoManager.class); 
-			Collection<Long> pullRequestIds = new HashSet<>();
-			for (ObjectId commit: getCommits()) 
-				pullRequestIds.addAll(infoManager.getPullRequestIds(getProject(), commit));		
-			
-			for (Long requestId: pullRequestIds) {
-				PullRequest request = OneDev.getInstance(PullRequestManager.class).get(requestId);
-				if (request != null && !pullRequests.contains(request))
-					pullRequests.add(request);
-			}
-			Collections.sort(pullRequests, new Comparator<PullRequest>() {
-
-				@Override
-				public int compare(PullRequest o1, PullRequest o2) {
-					return o2.getId().compareTo(o1.getId());
-				}
-				
-			});
-		}
-		return pullRequests;
+		return issueProduct2.getPullRequests();
 	}
 	
 	public List<RevCommit> getCommits() {
-		if (commits == null) {
-			commits = new ArrayList<>();
-			CommitInfoManager commitInfoManager = OneDev.getInstance(CommitInfoManager.class); 
-			for (ObjectId commitId: commitInfoManager.getFixCommits(getProject(), getNumber())) {
-				RevCommit commit = getProject().getRevCommit(commitId, false);
-				if (commit != null)
-					commits.add(commit);
-			}
-			Collections.sort(commits, new Comparator<RevCommit>() {
-	
-				@Override
-				public int compare(RevCommit o1, RevCommit o2) {
-					return o2.getCommitTime() - o1.getCommitTime();
-				}
-				
-			});
-		}
-		return commits;		
+		return issueProduct2.getCommits();		
 	}
 
 	@Override
@@ -683,11 +462,11 @@ public class Issue extends AbstractEntity implements Referenceable, AttachmentSt
 	}
 
 	public ProjectScopedNumber getFQN() {
-		return new ProjectScopedNumber(getProject(), getNumber());
+		return issueProduct2.getFQN();
 	}
 	
 	public String getNumberAndTitle() {
-		return "#" + getNumber() + " - " + getTitle();
+		return issueProduct2.getNumberAndTitle();
 	}
 	
 }
