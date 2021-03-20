@@ -32,9 +32,9 @@ import io.onedev.server.model.support.administration.GroovyScript;
 public class NodeJobSuggestion implements JobSuggestion {
 
 	private static final Logger logger = LoggerFactory.getLogger(NodeJobSuggestion.class);
-	
+
 	public static final String DETERMINE_PROJECT_VERSION = "node:determine-project-version";
-	
+
 	@Override
 	public Collection<Job> suggestJobs(Project project, ObjectId commitId) {
 		Collection<Job> jobs = new ArrayList<>();
@@ -42,7 +42,7 @@ public class NodeJobSuggestion implements JobSuggestion {
 		Blob blob = project.getBlob(new BlobIdent(commitId.name(), "package.json", FileMode.TYPE_FILE), false);
 		if (blob == null)
 			return jobs;
-		
+
 		String content = blob.getText().getContent();
 		ObjectMapper objectMapper = OneDev.getInstance(ObjectMapper.class);
 		JsonNode jsonNode;
@@ -57,9 +57,9 @@ public class NodeJobSuggestion implements JobSuggestion {
 			Job job = new Job();
 			job.setName("angular ci");
 			job.setImage("1dev/buildspec-node:10.16-alpine-chrome");
-			List<String> commands = Lists.newArrayList( 
-					"echo \"##onedev[SetBuildVersion '@" + VariableInterpolator.PREFIX_SCRIPTS + GroovyScript.BUILTIN_PREFIX + DETERMINE_PROJECT_VERSION + "@']\"", 
-					"echo", 
+			List<String> commands = Lists.newArrayList(
+					"echo \"##onedev[SetBuildVersion '@" + VariableInterpolator.PREFIX_SCRIPTS + GroovyScript.BUILTIN_PREFIX + DETERMINE_PROJECT_VERSION + "@']\"",
+					"echo",
 					"npm install",
 					"npm install @@angular/cli");
 
@@ -84,18 +84,18 @@ public class NodeJobSuggestion implements JobSuggestion {
 				}
 
 				if (valueArray[0] != null) {
-					for (int i = 0; i < valueIndex; i++) 
+					for (int i = 0; i < valueIndex; i++)
 						commands.add("npx " + valueArray[i]);
 				} else {
 					commands.addAll(Lists.newArrayList(
 							"npx ng lint",
-							"npx ng test --watch=false --browsers=ChromeHeadless", 
+							"npx ng test --watch=false --browsers=ChromeHeadless",
 							"npx ng build"));
 				}
 			} else {
 				commands.addAll(Lists.newArrayList(
 						"npx ng lint",
-						"npx ng test --watch=false --browsers=ChromeHeadless", 
+						"npx ng test --watch=false --browsers=ChromeHeadless",
 						"npx ng build"));
 			}
 
@@ -103,18 +103,18 @@ public class NodeJobSuggestion implements JobSuggestion {
 			setupTriggers(job);
 			setupCaches(job);
 			jobs.add(job);
-		} 
-		
+		}
+
 		if (content.indexOf("react") != -1) { // Recognize react projects
 			Job job = new Job();
 			job.setName("react ci");
 			job.setImage("node:10.16-alpine");
 
-			List<String> commands = Lists.newArrayList( 
-					"echo \"##onedev[SetBuildVersion '@" + VariableInterpolator.PREFIX_SCRIPTS + GroovyScript.BUILTIN_PREFIX + DETERMINE_PROJECT_VERSION + "@']\"", 
+			List<String> commands = Lists.newArrayList(
+					"echo \"##onedev[SetBuildVersion '@" + VariableInterpolator.PREFIX_SCRIPTS + GroovyScript.BUILTIN_PREFIX + DETERMINE_PROJECT_VERSION + "@']\"",
 					"echo",
-					"npm install typescript", 
-					"npm install", 
+					"npm install typescript",
+					"npm install",
 					"export CI=TRUE");
 
 			if (jsonNode.has("scripts")) {
@@ -139,12 +139,12 @@ public class NodeJobSuggestion implements JobSuggestion {
 					}
 				} else {
 					commands.addAll(Lists.newArrayList(
-							"npx react-scripts test", 
+							"npx react-scripts test",
 							"npx react-scripts build"));
 				}
 			} else {
 				commands.addAll(Lists.newArrayList(
-						"npx react-scripts test", 
+						"npx react-scripts test",
 						"npx react-scripts build"));
 			}
 
@@ -152,16 +152,16 @@ public class NodeJobSuggestion implements JobSuggestion {
 			setupTriggers(job);
 			setupCaches(job);
 			jobs.add(job);
-		} 
-		
+		}
+
 		if (content.indexOf("vue") != -1) { // Recognize vue projects
 			Job job = new Job();
 			job.setName("vue ci");
 			job.setImage("node:10.16-alpine");
 
-			List<String> commands = Lists.newArrayList( 
-					"echo \"##onedev[SetBuildVersion '@" + VariableInterpolator.PREFIX_SCRIPTS + GroovyScript.BUILTIN_PREFIX + DETERMINE_PROJECT_VERSION + "@']\"", 
-					"echo", 
+			List<String> commands = Lists.newArrayList(
+					"echo \"##onedev[SetBuildVersion '@" + VariableInterpolator.PREFIX_SCRIPTS + GroovyScript.BUILTIN_PREFIX + DETERMINE_PROJECT_VERSION + "@']\"",
+					"echo",
 					"npm install");
 
 			if (jsonNode.has("scripts")) {
@@ -195,51 +195,55 @@ public class NodeJobSuggestion implements JobSuggestion {
 			setupTriggers(job);
 			setupCaches(job);
 			jobs.add(job);
-		} 
-		
+		}
+
 		if (content.indexOf("express") != -1) { // Recognize express projects
-			Job job = new Job();
-			job.setName("express ci");
-			job.setImage("node:10.16-alpine");
+			this.addJobExpress(jobs, jsonNode);
+		}
+		return jobs;
+	}
 
-			List<String> commands = Lists.newArrayList( 
-					"echo \"##onedev[SetBuildVersion '@" + VariableInterpolator.PREFIX_SCRIPTS + GroovyScript.BUILTIN_PREFIX + DETERMINE_PROJECT_VERSION + "@']\"", 
-					"echo", 
-					"npm install");
+	private void addJobExpress(Collection<Job> jobs, JsonNode jsonNode) {
+		Job job = new Job();
+		job.setName("express ci");
+		job.setImage("node:10.16-alpine");
 
-			if (jsonNode.has("scripts")) {
-				JsonNode jsonScripts = jsonNode.get("scripts");
-				Iterator<String> iterator = jsonScripts.fieldNames();
-				int length = jsonScripts.size();
-				String[] valueArray = new String[length];
-				int valueIndex = 0;
+		List<String> commands = Lists.newArrayList(
+				"echo \"##onedev[SetBuildVersion '@" + VariableInterpolator.PREFIX_SCRIPTS + GroovyScript.BUILTIN_PREFIX + DETERMINE_PROJECT_VERSION + "@']\"",
+				"echo",
+				"npm install");
 
-				while (iterator.hasNext()) {
-					String key = (String) iterator.next();
-					if (key.indexOf("lint") != -1 || key.indexOf("test") != -1 || key.indexOf("build") != -1) {
-						String value = jsonScripts.findValue(key).asText();
-						valueArray[valueIndex] = value;
-						valueIndex++;
-					}
+		if (jsonNode.has("scripts")) {
+			JsonNode jsonScripts = jsonNode.get("scripts");
+			Iterator<String> iterator = jsonScripts.fieldNames();
+			int length = jsonScripts.size();
+			String[] valueArray = new String[length];
+			int valueIndex = 0;
+
+			while (iterator.hasNext()) {
+				String key = (String) iterator.next();
+				if (key.indexOf("lint") != -1 || key.indexOf("test") != -1 || key.indexOf("build") != -1) {
+					String value = jsonScripts.findValue(key).asText();
+					valueArray[valueIndex] = value;
+					valueIndex++;
 				}
+			}
 
-				if (valueArray[0] != null) {
-					for (int i = 0; i < valueIndex; i++) 
-						commands.add("npx " + valueArray[i]);
-				} else {
-					commands.add("npx mocha");
-				}
+			if (valueArray[0] != null) {
+				for (int i = 0; i < valueIndex; i++)
+					commands.add("npx " + valueArray[i]);
 			} else {
 				commands.add("npx mocha");
 			}
-			job.setCommands(commands);
-			setupTriggers(job);
-			setupCaches(job);
-			jobs.add(job);
-		} 
-		return jobs;
+		} else {
+			commands.add("npx mocha");
+		}
+		job.setCommands(commands);
+		setupTriggers(job);
+		setupCaches(job);
+		jobs.add(job);
 	}
-	
+
 	private void setupCaches(Job job) {
 		CacheSpec cache = new CacheSpec();
 		cache.setKey("npm-cache");
@@ -251,7 +255,7 @@ public class NodeJobSuggestion implements JobSuggestion {
 		BranchUpdateTrigger trigger = new BranchUpdateTrigger();
 		job.getTriggers().add(trigger);
 	}
-	
+
 	@Nullable
 	private static JsonNode getPackageJson(Project project, ObjectId commitId) {
 		Blob blob = project.getBlob(new BlobIdent(commitId.name(), "package.json", FileMode.TYPE_FILE), false);
@@ -263,7 +267,7 @@ public class NodeJobSuggestion implements JobSuggestion {
 			} catch (IOException e) {
 				logger.error("Error parsing package.json", e);
 			}
-		} 
+		}
 		return null;
 	}
 
@@ -278,8 +282,7 @@ public class NodeJobSuggestion implements JobSuggestion {
 					return versionNode.asText();
 				else
 					return null;
-			}
-			else
+			} else
 				return null;
 		} else {
 			return null;

@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.jgit.lib.ObjectId;
-
+import io.onedev.k8shelper.CacheInstance;
 import io.onedev.k8shelper.CloneInfo;
 import io.onedev.server.util.SimpleLogger;
 import io.onedev.server.util.patternset.PatternSet;
@@ -164,5 +164,18 @@ public abstract class JobContext {
 	public abstract void notifyJobRunning();
 	
 	public abstract void reportJobWorkspace(String jobWorkspace);
+
+	public void updateCacheCounts(Collection<CacheInstance> cacheInstances, Collection<String> allAllocated) {
+		for (CacheInstance cacheInstance : cacheInstances) {
+			if (!allAllocated.contains(cacheInstance.getName())) {
+				String cacheKey = cacheInstance.getCacheKey();
+				Integer cacheCount = getCacheCounts().get(cacheKey);
+				if (cacheCount == null)
+					cacheCount = 0;
+				cacheCount++;
+				getCacheCounts().put(cacheKey, cacheCount);
+			}
+		}
+	}
 	
 }
